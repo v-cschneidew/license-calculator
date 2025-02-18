@@ -10,33 +10,63 @@ $(document).ready(() => {
   };
 
   const renderLicenses = () => {
-    $("#licenseList").empty();
+    const licenseList = $("#licenseList");
+    licenseList.empty();
+
     licenses.forEach((license, index) => {
       const licenseItem = $(`
-          <div class="row g-3 mb-3" data-index="${index}">
-            <div class="col-md-6">
-              <input type="text" class="form-control license-name" 
-                     value="${license.name}" placeholder="License name">
-            </div>
-            <div class="col-md-4">
-              <input type="number" class="form-control license-price" 
-                     step="0.01" value="${license.price}" placeholder="Price">
-            </div>
-            <div class="col-md-2">
-              <button class="btn btn-danger w-100 remove-btn">
-                <i class="bi bi-trash"></i>
-              </button>
+        <div class="row g-3 mb-3 align-items-center sortable-item" data-index="${index}">
+          <div class="col-auto" style="width: 60px;">
+            <div class="d-flex align-items-center">
+              <i class="bi bi-grip-vertical handle" style="cursor: move; margin-right: 4px;"></i>
+              <span class="license-index">${index + 1}.</span>
             </div>
           </div>
-        `);
+          <div class="col">
+            <input type="text" class="form-control license-name" 
+                   value="${license.name}" placeholder="License name">
+          </div>
+          <div class="col-md-3">
+            <input type="number" class="form-control license-price" 
+                   step="0.01" value="${license.price}" placeholder="Price">
+          </div>
+          <div class="col-auto" style="width: 50px;">
+            <button class="btn btn-danger remove-btn" title="Remove">
+              <i class="bi bi-trash"></i>
+            </button>
+          </div>
+        </div>
+      `);
 
+      // Remove button handler
       licenseItem.find(".remove-btn").click(() => {
+        const index = licenseItem.data("index");
         licenses.splice(index, 1);
         renderLicenses();
       });
 
-      $("#licenseList").append(licenseItem);
+      licenseList.append(licenseItem);
     });
+
+    // Initialize jQuery UI Sortable on the licenseList container if not already initialized.
+    if (!licenseList.hasClass("ui-sortable")) {
+      licenseList.sortable({
+        handle: ".handle",
+        update: function (event, ui) {
+          const newLicenses = [];
+          licenseList.children(".row").each(function (i) {
+            // Update the displayed index in the compact handle/index column.
+            $(this)
+              .find(".license-index")
+              .text(i + 1 + ".");
+            const name = $(this).find(".license-name").val();
+            const price = parseFloat($(this).find(".license-price").val()) || 0;
+            newLicenses.push({ name, price });
+          });
+          licenses = newLicenses;
+        },
+      });
+    }
   };
 
   // Modified Add License button handler
@@ -68,7 +98,15 @@ $(document).ready(() => {
 
     chrome.storage.local.set({ licenses: updatedLicenses }, () => {
       licenses = updatedLicenses;
-      alert("Settings saved successfully!");
+      // Show Bootstrap Toast
+      const toastElement = document.getElementById("saveToast");
+      if (toastElement) {
+        // Create a new toast instance with a 3-second delay
+        const toast = new bootstrap.Toast(toastElement, { delay: 3000 });
+        toast.show();
+      } else {
+        console.error("Save toast element not found!");
+      }
     });
   });
 
