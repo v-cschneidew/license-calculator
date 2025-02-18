@@ -1,0 +1,42 @@
+/* Popup styling */
+.popup-body {
+  min-width: 350px;
+}
+
+.result-card {
+  background: #f8f9fa;
+  border: 1px solid rgba(0, 0, 0, 0.125);
+}
+
+.copy-icon {
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.copy-icon:hover {
+  color: #0d6efd;
+}
+
+/* Options page styling */
+body {
+  min-width: 800px;
+  padding: 20px;
+}
+
+.license-name {
+  min-width: 300px;
+}
+
+.license-price {
+  min-width: 150px;
+}
+
+.dropdown-menu {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.card {
+  margin-top: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
