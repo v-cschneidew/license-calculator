@@ -10,11 +10,11 @@ There are two ways to get started: clone the repository with Git or download a Z
 
 1. Open a terminal and clone the repository:
 
-   `git clone https://github.com/yourusername/repositoryname.git`
+   `git clone https://github.com/v-cschneidew/license-calculator.git`
 
 2. Navigate into the repository directory:
 
-   `cd repositoryname`
+   `cd license-calculator`
 
 ### Using ZIP Download
 

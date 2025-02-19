@@ -27,6 +27,7 @@ $(document).ready(() => {
           .click(() => {
             selectedLicense = license;
             $("#licenseSearch").val(license.name);
+            $("#quantity").val("1"); // Auto-set quantity to 1 on license selection
             $("#licenseResults").hide();
             calculateTotal();
           })
@@ -38,12 +39,21 @@ $(document).ready(() => {
   // Calculation function
   const calculateTotal = () => {
     if (!selectedLicense || !$("#quantity").val()) {
+      $("#calculationDetails").text(""); // Clear any previous details
       $("#result").text("0");
       return;
     }
 
     const quantity = parseInt($("#quantity").val()) || 0;
-    const total = quantity * selectedLicense.price * 12;
+    const price = selectedLicense.price;
+
+    // Build a calculation string such as "$20 x 12 months x 5 ="
+    const calcString = `$${price} x 12 months x ${quantity} =`;
+
+    const total = quantity * price * 12;
+
+    // Update the UI elements: the detailed calculation and final result
+    $("#calculationDetails").text(calcString);
     $("#result").text(Math.round(total));
   };
 
