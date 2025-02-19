@@ -7,7 +7,7 @@
     "default_icon": "icon.png"
   },
   "options_page": "options.html",
-  "permissions": ["storage"],
+  "permissions": ["storage", "clipboardWrite"],
   "icons": {
     "128": "icon.png"
   }

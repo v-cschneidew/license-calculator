@@ -43,3 +43,31 @@ body {
   margin-top: 20px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
+
+/* Ensure the copy icon container is relatively positioned */
+#copyIcon {
+  position: relative;
+  display: inline-block;
+}
+
+/* Style for the tooltip */
+.copy-tooltip {
+  position: absolute;
+  bottom: 100%; /* positions it above the icon; change to top: 100% and margin-top if you prefer below */
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 8px; /* adjust the spacing as needed */
+  white-space: nowrap;
+  font-size: 0.8em;
+  background-color: #28a745;
+  color: #fff;
+  padding: 2px 6px;
+  border-radius: 4px;
+  opacity: 0.9;
+  pointer-events: none; /* prevents interference with mouse events */
+  z-index: 100;
+}
+
+#quantity + .form-text {
+  font-size: 0.8em;
+}

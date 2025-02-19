@@ -48,15 +48,31 @@ $(document).ready(() => {
   };
 
   // Quantity input handler
-  $("#quantity").on("input", calculateTotal);
+  $("#quantity").on("input", function () {
+    // Remove any non-digit characters to enforce whole integers
+    this.value = this.value.replace(/[^0-9]/g, "");
+    calculateTotal();
+  });
 
-  // Copy to clipboard
-  $("#copyIcon").on("dblclick", function () {
+  // Copy to clipboard with visual feedback
+  $("#copyIcon").on("click", function () {
     const total = $("#result").text();
     if (total !== "0") {
       navigator.clipboard.writeText(total);
-      $(this).addClass("text-success");
-      setTimeout(() => $(this).removeClass("text-success"), 1000);
+      const $copyIcon = $(this);
+      $copyIcon.addClass("text-success");
+
+      // Create the tooltip and append it as a child of the icon
+      const $tooltip = $("<span>").addClass("copy-tooltip").text("Copied!");
+      $copyIcon.append($tooltip);
+
+      // Fade out and remove the tooltip after 1 second
+      setTimeout(() => {
+        $tooltip.fadeOut(300, function () {
+          $(this).remove();
+        });
+        $copyIcon.removeClass("text-success");
+      }, 1000);
     }
   });
 
