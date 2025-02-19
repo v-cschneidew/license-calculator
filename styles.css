@@ -71,3 +71,8 @@ body {
 #quantity + .form-text {
   font-size: 0.8em;
 }
+
+.dropdown-item.active {
+  background-color: #007bff;
+  color: white;
+}

@@ -1,6 +1,26 @@
 $(document).ready(() => {
   let licenses = [];
   let selectedLicense = null;
+  let activeIndex = -1; // For keyboard navigation
+
+  // Debounce function to limit rate of function execution
+  function debounce(fn, delay) {
+    let timeoutId;
+    return function (...args) {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        fn.apply(this, args);
+      }, delay);
+    };
+  }
+
+  // Update highlighted dropdown item based on activeIndex
+  function updateHighlightedItem() {
+    $("#licenseResults li").removeClass("active");
+    if (activeIndex >= 0) {
+      $("#licenseResults li").eq(activeIndex).addClass("active");
+    }
+  }
 
   // Load licenses from storage
   chrome.storage.local.get(["licenses"], (data) => {
@@ -8,38 +28,76 @@ $(document).ready(() => {
     $("#licenseSearch").prop("disabled", false);
   });
 
-  // Search functionality
-  $("#licenseSearch").on("input", function () {
-    const searchTerm = $(this).val().toLowerCase();
+  // Render dropdown items based on the search term
+  function renderDropdownItems(searchTerm) {
     $("#licenseResults").empty().show();
+    activeIndex = -1; // reset active index
 
     if (searchTerm.length > 0) {
       const filtered = licenses.filter((license) =>
         license.name.toLowerCase().includes(searchTerm)
       );
 
-      filtered.forEach((license) => {
+      if (filtered.length === 0) {
+        // Provide clear "No Matches Found" feedback
         $("<li>")
-          .addClass("dropdown-item")
-          .html(
-            `<strong>${license.name}</strong> <span class="text-muted">$${license.price}/mo</span>`
-          )
-          .click(() => {
-            selectedLicense = license;
-            $("#licenseSearch").val(license.name);
-            $("#quantity").val("1"); // Auto-set quantity to 1 on license selection
-            $("#licenseResults").hide();
-            calculateTotal();
-          })
+          .addClass("dropdown-item disabled")
+          .text("No Matches Found")
           .appendTo("#licenseResults");
-      });
+      } else {
+        filtered.forEach((license) => {
+          $("<li>")
+            .addClass("dropdown-item")
+            .html(
+              `<strong>${license.name}</strong> <span class="text-muted">$${license.price}/mo</span>`
+            )
+            .on("click", () => {
+              selectedLicense = license;
+              $("#licenseSearch").val(license.name);
+              $("#quantity").val("1"); // Auto-set quantity to 1 on license selection
+              $("#licenseResults").hide();
+              calculateTotal();
+            })
+            .appendTo("#licenseResults");
+        });
+      }
+    }
+  }
+
+  // Debounced search handler
+  const debouncedSearchHandler = debounce(function () {
+    const searchTerm = $("#licenseSearch").val().toLowerCase();
+    renderDropdownItems(searchTerm);
+  }, 300);
+
+  // Search functionality (debounced)
+  $("#licenseSearch").on("input", debouncedSearchHandler);
+
+  // Keyboard navigation for the dropdown
+  $("#licenseSearch").on("keydown", function (e) {
+    const $items = $("#licenseResults li");
+    if ($items.length === 0) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      activeIndex = activeIndex < $items.length - 1 ? activeIndex + 1 : 0;
+      updateHighlightedItem();
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      activeIndex = activeIndex > 0 ? activeIndex - 1 : $items.length - 1;
+      updateHighlightedItem();
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (activeIndex >= 0 && !$items.eq(activeIndex).hasClass("disabled")) {
+        $items.eq(activeIndex).click();
+      }
     }
   });
 
   // Calculation function
   const calculateTotal = () => {
     if (!selectedLicense || !$("#quantity").val()) {
-      $("#calculationDetails").text(""); // Clear any previous details
+      $("#calculationDetails").text(""); // Clear previous details
       $("#result").text("0");
       return;
     }
@@ -49,17 +107,16 @@ $(document).ready(() => {
 
     // Build a calculation string such as "$20 x 12 months x 5 ="
     const calcString = `$${price} x 12 months x ${quantity} =`;
-
     const total = quantity * price * 12;
 
-    // Update the UI elements: the detailed calculation and final result
+    // Update UI elements for detailed calculation and final result
     $("#calculationDetails").text(calcString);
     $("#result").text(Math.round(total));
   };
 
   // Quantity input handler
   $("#quantity").on("input", function () {
-    // Remove any non-digit characters to enforce whole integers
+    // Remove non-digit characters
     this.value = this.value.replace(/[^0-9]/g, "");
     calculateTotal();
   });
@@ -72,11 +129,11 @@ $(document).ready(() => {
       const $copyIcon = $(this);
       $copyIcon.addClass("text-success");
 
-      // Create the tooltip and append it as a child of the icon
+      // Create and append tooltip
       const $tooltip = $("<span>").addClass("copy-tooltip").text("Copied!");
       $copyIcon.append($tooltip);
 
-      // Fade out and remove the tooltip after 1 second
+      // Fade out and remove tooltip after 1 second
       setTimeout(() => {
         $tooltip.fadeOut(300, function () {
           $(this).remove();
