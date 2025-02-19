@@ -53,4 +53,6 @@ There are two ways to get started: clone the repository with Git or download a Z
 2. Click **Load Temporary Add-on**.
 3. Select the `manifest.json` file inside the extension folder.
 
-## This extension was written with Cursor IDE in a few hours. :D
+## About the Extension
+
+This extension was developed using Cursor IDE in just a few hours.
