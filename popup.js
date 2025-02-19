@@ -18,7 +18,11 @@ $(document).ready(() => {
   function updateHighlightedItem() {
     $("#licenseResults li").removeClass("active");
     if (activeIndex >= 0) {
-      $("#licenseResults li").eq(activeIndex).addClass("active");
+      let $activeItem = $("#licenseResults li").eq(activeIndex);
+      $activeItem.addClass("active");
+      // Scroll the active item into view with a smooth transition.
+      // 'block: "nearest"' ensures that if the item is partially visible, it remains visible.
+      $activeItem[0].scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   }
 
