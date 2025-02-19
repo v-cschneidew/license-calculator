@@ -22,16 +22,17 @@ $(document).ready(() => {
     }
   }
 
-  // Load licenses from storage
+  // Load licenses from storage and focus on the search input automatically
   chrome.storage.local.get(["licenses"], (data) => {
     licenses = data.licenses || [];
     $("#licenseSearch").prop("disabled", false);
+    $("#licenseSearch").focus(); // Auto-focus on search input upon popup open
   });
 
   // Render dropdown items based on the search term
   function renderDropdownItems(searchTerm) {
     $("#licenseResults").empty().show();
-    activeIndex = -1; // reset active index
+    activeIndex = -1; // Reset active index
 
     if (searchTerm.length > 0) {
       const filtered = licenses.filter((license) =>
