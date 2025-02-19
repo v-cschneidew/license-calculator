@@ -1,6 +1,6 @@
-# License Manager Extension
+# License Calculator Extension
 
-A simple browser extension for managing licenses with CSV import/export support. It provides a user-friendly interface to add, remove, and modify licenses. This extension uses local storage and supports drag-and-drop sorting for ease of use.
+This extension calculates the annual total cost for a selected license based on the specified quantity.
 
 ## Installation
 
@@ -9,13 +9,12 @@ There are two ways to get started: clone the repository with Git or download a Z
 ### Using Git
 
 1. Open a terminal and clone the repository:
-   \[
-   \texttt{git clone https://github.com/yourusername/repositoryname.git}
-   \]
+
+   `git clone https://github.com/yourusername/repositoryname.git`
+
 2. Navigate into the repository directory:
-   \[
-   \texttt{cd repositoryname}
-   \]
+
+   `cd repositoryname`
 
 ### Using ZIP Download
 
@@ -28,35 +27,30 @@ There are two ways to get started: clone the repository with Git or download a Z
 ### Google Chrome
 
 1. Open Chrome and navigate to:
-   \[
-   \texttt{chrome://extensions/}
-   \]
+
+   `chrome://extensions/`
+
 2. Enable **Developer mode** by toggling the switch at the top right.
 3. Click **Load unpacked**.
-4. Select the extension folder (the directory that contains the \texttt{manifest.json} file).
+4. Select the extension folder (the directory that contains the `manifest.json` file).
 
 ### Microsoft Edge
 
 1. Open Edge and navigate to:
-   \[
-   \texttt{edge://extensions/}
-   \]
+
+   `edge://extensions/`
+
 2. Enable **Developer mode** using the toggle in the lower-left corner.
 3. Click **Load unpacked**.
-4. Select the extension folder (the directory with the \texttt{manifest.json} file).
+4. Select the extension folder (the directory with the `manifest.json` file).
 
 ### Mozilla Firefox
 
 1. Open Firefox and navigate to:
-   \[
-   \texttt{about:debugging#/runtime/this-firefox}
-   \]
+
+   `about:debugging#/runtime/this-firefox`
+
 2. Click **Load Temporary Add-on**.
-3. Select the \texttt{manifest.json} file inside the extension folder.
+3. Select the `manifest.json` file inside the extension folder.
 
-## Additional Information
-
-- If you encounter any issues or need further assistance, please open an issue on the [GitHub repository](https://github.com/yourusername/repositoryname/issues).
-- Contributions and pull requests are welcome!
-
-Happy coding!
+## This extension was written with Cursor IDE in a few hours. :D
