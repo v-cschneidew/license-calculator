@@ -36,13 +36,21 @@ const LicenseState = (function () {
   }
 
   function addLicense(license) {
-    licenses.push(license);
+    licenses.push({
+      name: license.name || "",
+      price: license.price || 0,
+      sourceUrl: license.sourceUrl || "",
+    });
     notify();
   }
 
   function updateLicense(index, license) {
     if (index >= 0 && index < licenses.length) {
-      licenses[index] = license;
+      licenses[index] = {
+        name: license.name || "",
+        price: license.price || 0,
+        sourceUrl: license.sourceUrl || "",
+      };
       notify();
     }
   }

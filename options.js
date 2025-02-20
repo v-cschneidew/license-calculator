@@ -7,7 +7,10 @@
 const CSVHelper = {
   exportToCsv: function (licenses) {
     const csvContent =
-      "Name,Price\n" + licenses.map((l) => `${l.name},${l.price}`).join("\n");
+      "Name,Price,Source URL\n" +
+      licenses
+        .map((l) => `${l.name},${l.price},${l.sourceUrl || ""}`)
+        .join("\n");
     const blob = new Blob([csvContent], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -19,18 +22,21 @@ const CSVHelper = {
   importFromCsv: function (file) {
     return new Promise((resolve, reject) => {
       Papa.parse(file, {
-        header: true, // Use the CSV header row for keys
-        skipEmptyLines: true, // Ignore empty lines in the CSV file
+        header: true,
+        skipEmptyLines: true,
         error: function (err) {
           reject(err);
         },
         complete: function (results) {
-          // Map parsed data to your license objects.
-          // This code supports either "Name"/"Price" or "name"/"price" as headers.
           const importedLicenses = results.data.map((record) => {
             return {
               name: (record["Name"] || record["name"] || "").trim(),
               price: parseFloat(record["Price"] || record["price"]) || 0,
+              sourceUrl: (
+                record["Source URL"] ||
+                record["sourceUrl"] ||
+                ""
+              ).trim(),
             };
           });
           resolve(importedLicenses);
@@ -65,23 +71,39 @@ const OptionsUI = (function () {
   // This variable tracks which license is pending removal.
   let pendingRemovalIndex = null;
 
+  // Add this utility function at the top level
+  function sanitizeLicenseData(license) {
+    return {
+      name: (license.name || "").trim(),
+      price: parseFloat(license.price) || 0,
+      sourceUrl: (license.sourceUrl || "").trim(),
+    };
+  }
+
   // Create an auto-save function that gathers current state from the DOM
   // and saves it using LicenseStorage. We debounce here so that rapidly occurring
   // events (like typing) do not trigger too many saves.
   const autoSave = debounce(function () {
     const updatedLicenses = [];
     $("#licenseList .row").each(function () {
-      updatedLicenses.push({
+      const license = sanitizeLicenseData({
         name: $(this).find(".license-name").val(),
-        price: parseFloat($(this).find(".license-price").val()) || 0,
+        price: $(this).find(".license-price").val(),
+        sourceUrl: $(this).find(".license-url").val(),
       });
+      updatedLicenses.push(license);
     });
+
     LicenseStorage.saveLicenses(updatedLicenses)
       .then(() => {
-        // Optionally, you could show a "saved" indicator instead of logging.
-        console.log("Licenses auto-saved.");
+        const toast = new bootstrap.Toast(document.getElementById("saveToast"));
+        toast.show();
       })
-      .catch((error) => console.error("Error auto-saving licenses:", error));
+      .catch((error) => {
+        console.error("Error auto-saving licenses:", error);
+        // Show error toast or alert
+        alert("Failed to save changes. Please try again.");
+      });
   }, 800);
 
   return {
@@ -124,6 +146,23 @@ const OptionsUI = (function () {
 
       // Subscribe to changes from LicenseState so that the UI updates automatically.
       LicenseState.subscribe(() => this.renderLicenses());
+
+      // Add event listener for URL input
+      $(document).on("change", ".license-url", function () {
+        const url = $(this).val().trim();
+        if (url && !isValidUrl(url)) {
+          $(this).addClass("is-invalid");
+          if (!$(this).next(".invalid-feedback").length) {
+            $(this).after(
+              '<div class="invalid-feedback">Please enter a valid http:// or https:// URL</div>'
+            );
+          }
+        } else {
+          $(this).removeClass("is-invalid");
+          $(this).next(".invalid-feedback").remove();
+        }
+        autoSave();
+      });
     },
 
     renderLicenses: function () {
@@ -149,7 +188,12 @@ const OptionsUI = (function () {
               const name = $(this).find(".license-name").val();
               const price =
                 parseFloat($(this).find(".license-price").val()) || 0;
-              newLicenses.push({ name, price });
+              const sourceUrl = $(this).find(".license-url").val() || "";
+              newLicenses.push({
+                name,
+                price,
+                sourceUrl,
+              });
             });
             LicenseState.setLicenses(newLicenses);
             autoSave(); // Auto-save after the new order is set.
@@ -159,6 +203,11 @@ const OptionsUI = (function () {
     },
 
     createLicenseRow: function (license, index) {
+      const escapedName = $("<div>").text(license.name).html();
+      const escapedUrl = $("<div>")
+        .text(license.sourceUrl || "")
+        .html();
+
       return $(`
         <div class="row g-3 mb-3 align-items-center sortable-item" data-index="${index}">
           <div class="col-auto" style="width: 60px;">
@@ -168,14 +217,18 @@ const OptionsUI = (function () {
             </div>
           </div>
           <div class="col">
-            <input type="text" class="form-control license-name" value="${
-              license.name
-            }" placeholder="License name">
+            <input type="text" class="form-control license-name" value="${escapedName}" placeholder="License name">
           </div>
           <div class="col-md-3">
             <input type="number" class="form-control license-price" step="0.01" min="0" value="${
               license.price
             }" placeholder="Price">
+          </div>
+          <div class="col">
+            <div class="input-group">
+              <span class="input-group-text"><i class="bi bi-link-45deg"></i></span>
+              <input type="url" class="form-control license-url" value="${escapedUrl}" placeholder="Pricing source URL">
+            </div>
           </div>
           <div class="col-auto" style="width: 50px;">
             <button class="btn btn-danger remove-btn" title="Remove">
@@ -189,14 +242,16 @@ const OptionsUI = (function () {
     handleAddLicense: function () {
       const currentState = [];
       $("#licenseList .row").each(function () {
-        currentState.push({
+        const license = sanitizeLicenseData({
           name: $(this).find(".license-name").val(),
-          price: parseFloat($(this).find(".license-price").val()) || 0,
+          price: $(this).find(".license-price").val(),
+          sourceUrl: $(this).find(".license-url").val(),
         });
+        currentState.push(license);
       });
       LicenseState.setLicenses(currentState);
-      LicenseState.addLicense({ name: "", price: 0 });
-      autoSave(); // Auto-save after adding a license.
+      LicenseState.addLicense({ name: "", price: 0, sourceUrl: "" });
+      autoSave();
     },
 
     handleExportCsv: function () {
@@ -208,13 +263,15 @@ const OptionsUI = (function () {
       if (file) {
         try {
           const importedLicenses = await CSVHelper.importFromCsv(file);
-          LicenseState.setLicenses(importedLicenses);
-          autoSave(); // Auto-save after importing CSV data.
+          // Sanitize imported data
+          const sanitizedLicenses = importedLicenses.map(sanitizeLicenseData);
+          LicenseState.setLicenses(sanitizedLicenses);
+          autoSave();
         } catch (error) {
           console.error("Error importing CSV:", error);
+          alert("Error importing CSV file. Please check the file format.");
         }
       }
-      // Reset file input to allow re-importing the same file if needed.
       $(e.target).val("");
     },
 
@@ -270,3 +327,13 @@ $(document).ready(() => {
   });
   OptionsUI.init();
 });
+
+function isValidUrl(string) {
+  if (!string) return true; // Empty URLs are considered valid
+  try {
+    const url = new URL(string);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch (_) {
+    return false;
+  }
+}

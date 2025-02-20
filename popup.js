@@ -115,6 +115,7 @@ const PopupUI = (function () {
       $licenseSearch.val(license.name);
       $quantity.val("1");
       $licenseResults.hide();
+      updateSourceLink(license);
       calculateTotal();
     });
 
@@ -210,6 +211,16 @@ const PopupUI = (function () {
 
     $calculationDetails.text(calcString);
     $result.text(Math.round(total));
+  }
+
+  function updateSourceLink(license) {
+    const $sourceLink = $("#sourceLink");
+    if (license && license.sourceUrl) {
+      $sourceLink.find("a").attr("href", license.sourceUrl);
+      $sourceLink.show();
+    } else {
+      $sourceLink.hide();
+    }
   }
 
   return {
