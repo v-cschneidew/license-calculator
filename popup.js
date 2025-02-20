@@ -1,9 +1,15 @@
-$(document).ready(() => {
-  let licenses = [];
-  let selectedLicense = null;
-  let activeIndex = -1; // For keyboard navigation
+$(document).ready(async () => {
+  try {
+    // Load licenses and then initialize the popup UI.
+    await LicenseState.load();
+    PopupUI.init();
+  } catch (error) {
+    console.error("Error initializing LicenseState:", error);
+  }
+});
 
-  // Debounce function to limit rate of function execution
+// Utility Module for common helper functions
+const UtilityModule = (function () {
   function debounce(fn, delay) {
     let timeoutId;
     return function (...args) {
@@ -13,42 +19,168 @@ $(document).ready(() => {
       }, delay);
     };
   }
+  return { debounce };
+})();
 
-  // Update highlighted dropdown item based on activeIndex
+// Updated Data Module to use LicenseState
+const DataModule = (function () {
+  let selectedLicense = null;
+
+  function init() {
+    // Licenses are already loaded in LicenseState.
+    return LicenseState.getLicenses();
+  }
+
+  function setSelectedLicense(license) {
+    selectedLicense = license;
+  }
+
+  function getSelectedLicense() {
+    return selectedLicense;
+  }
+
+  function getLicenses() {
+    return LicenseState.getLicenses();
+  }
+
+  return {
+    init,
+    setSelectedLicense,
+    getSelectedLicense,
+    getLicenses,
+  };
+})();
+
+// Rename UIModule to PopupUI for clarity.
+const PopupUI = (function () {
+  let activeIndex = -1;
+  let $licenseSearch,
+    $licenseResults,
+    $quantity,
+    $calculationDetails,
+    $result,
+    $copyIcon;
+
+  function init() {
+    // Cache jQuery DOM elements
+    $licenseSearch = $("#licenseSearch");
+    $licenseResults = $("#licenseResults");
+    $quantity = $("#quantity");
+    $calculationDetails = $("#calculationDetails");
+    $result = $("#result");
+    $copyIcon = $("#copyIcon");
+
+    // Enable and focus on the search input after data is loaded
+    $licenseSearch.prop("disabled", false);
+    $licenseSearch.focus();
+
+    bindUIEvents();
+  }
+
+  function bindUIEvents() {
+    // Debounced search handler
+    const debouncedSearchHandler = UtilityModule.debounce(function () {
+      const searchTerm = $licenseSearch.val().toLowerCase();
+      renderDropdownItems(searchTerm);
+    }, 300);
+    $licenseSearch.on("input", debouncedSearchHandler);
+
+    // Keyboard navigation for the dropdown
+    $licenseSearch.on("keydown", function (e) {
+      const $items = $licenseResults.find("li");
+      if ($items.length === 0) return;
+
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        activeIndex = activeIndex < $items.length - 1 ? activeIndex + 1 : 0;
+        updateHighlightedItem();
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        activeIndex = activeIndex > 0 ? activeIndex - 1 : $items.length - 1;
+        updateHighlightedItem();
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        if (activeIndex >= 0 && !$items.eq(activeIndex).hasClass("disabled")) {
+          $items.eq(activeIndex).click();
+        }
+      }
+    });
+
+    // Click event for dropdown items using delegation
+    $licenseResults.on("click", "li.dropdown-item:not(.disabled)", function () {
+      const licenseName = $(this).find("strong").text();
+      const licenses = DataModule.getLicenses();
+      const license = licenses.find((lic) => lic.name === licenseName);
+      DataModule.setSelectedLicense(license);
+      $licenseSearch.val(license.name);
+      $quantity.val("1");
+      $licenseResults.hide();
+      calculateTotal();
+    });
+
+    // Quantity input handler
+    $quantity.on("input", function () {
+      this.value = this.value.replace(/[^0-9]/g, "");
+      calculateTotal();
+    });
+
+    // Copy to clipboard with visual copy feedback
+    $copyIcon.on("click", function () {
+      const total = $result.text();
+      if (total !== "0") {
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(total).catch((err) => {
+            console.error("Clipboard error:", err);
+          });
+        } else {
+          const $tempInput = $("<textarea>");
+          $("body").append($tempInput);
+          $tempInput.val(total).select();
+          document.execCommand("copy");
+          $tempInput.remove();
+        }
+        const $tooltip = $("<span>").addClass("copy-tooltip").text("Copied!");
+        $copyIcon.addClass("text-success").append($tooltip);
+        setTimeout(function () {
+          $tooltip.fadeOut(300, function () {
+            $(this).remove();
+            $copyIcon.removeClass("text-success");
+          });
+        }, 1000);
+      }
+    });
+
+    // Hide dropdown when clicking outside
+    $(document).on("click", function (e) {
+      if (!$(e.target).closest(".dropdown").length) {
+        $licenseResults.hide();
+      }
+    });
+  }
+
   function updateHighlightedItem() {
-    $("#licenseResults li").removeClass("active");
+    $licenseResults.find("li").removeClass("active");
     if (activeIndex >= 0) {
-      let $activeItem = $("#licenseResults li").eq(activeIndex);
+      let $activeItem = $licenseResults.find("li").eq(activeIndex);
       $activeItem.addClass("active");
-      // Scroll the active item into view with a smooth transition.
-      // 'block: "nearest"' ensures that if the item is partially visible, it remains visible.
       $activeItem[0].scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   }
 
-  // Load licenses from storage and focus on the search input automatically
-  chrome.storage.local.get(["licenses"], (data) => {
-    licenses = data.licenses || [];
-    $("#licenseSearch").prop("disabled", false);
-    $("#licenseSearch").focus(); // Auto-focus on search input upon popup open
-  });
-
-  // Render dropdown items based on the search term
   function renderDropdownItems(searchTerm) {
-    $("#licenseResults").empty().show();
-    activeIndex = -1; // Reset active index
+    $licenseResults.empty().show();
+    activeIndex = -1;
 
     if (searchTerm.length > 0) {
+      const licenses = DataModule.getLicenses();
       const filtered = licenses.filter((license) =>
         license.name.toLowerCase().includes(searchTerm)
       );
-
       if (filtered.length === 0) {
-        // Provide clear "No Matches Found" feedback
         $("<li>")
           .addClass("dropdown-item disabled")
           .text("No Matches Found")
-          .appendTo("#licenseResults");
+          .appendTo($licenseResults);
       } else {
         filtered.forEach((license) => {
           $("<li>")
@@ -56,102 +188,32 @@ $(document).ready(() => {
             .html(
               `<strong>${license.name}</strong> <span class="text-muted">$${license.price}/mo</span>`
             )
-            .on("click", () => {
-              selectedLicense = license;
-              $("#licenseSearch").val(license.name);
-              $("#quantity").val("1"); // Auto-set quantity to 1 on license selection
-              $("#licenseResults").hide();
-              calculateTotal();
-            })
-            .appendTo("#licenseResults");
+            .appendTo($licenseResults);
         });
       }
+    } else {
+      $licenseResults.hide();
     }
   }
 
-  // Debounced search handler
-  const debouncedSearchHandler = debounce(function () {
-    const searchTerm = $("#licenseSearch").val().toLowerCase();
-    renderDropdownItems(searchTerm);
-  }, 300);
-
-  // Search functionality (debounced)
-  $("#licenseSearch").on("input", debouncedSearchHandler);
-
-  // Keyboard navigation for the dropdown
-  $("#licenseSearch").on("keydown", function (e) {
-    const $items = $("#licenseResults li");
-    if ($items.length === 0) return;
-
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      activeIndex = activeIndex < $items.length - 1 ? activeIndex + 1 : 0;
-      updateHighlightedItem();
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      activeIndex = activeIndex > 0 ? activeIndex - 1 : $items.length - 1;
-      updateHighlightedItem();
-    } else if (e.key === "Enter") {
-      e.preventDefault();
-      if (activeIndex >= 0 && !$items.eq(activeIndex).hasClass("disabled")) {
-        $items.eq(activeIndex).click();
-      }
-    }
-  });
-
-  // Calculation function
-  const calculateTotal = () => {
-    if (!selectedLicense || !$("#quantity").val()) {
-      $("#calculationDetails").text(""); // Clear previous details
-      $("#result").text("0");
+  function calculateTotal() {
+    const selectedLicense = DataModule.getSelectedLicense();
+    if (!selectedLicense || !$quantity.val()) {
+      $calculationDetails.text("");
+      $result.text("0");
       return;
     }
-
-    const quantity = parseInt($("#quantity").val()) || 0;
+    const quantity = parseInt($quantity.val()) || 0;
     const price = selectedLicense.price;
-
-    // Build a calculation string such as "$20 x 12 months x 5 ="
     const calcString = `$${price} x 12 months x ${quantity} =`;
     const total = quantity * price * 12;
 
-    // Update UI elements for detailed calculation and final result
-    $("#calculationDetails").text(calcString);
-    $("#result").text(Math.round(total));
+    $calculationDetails.text(calcString);
+    $result.text(Math.round(total));
+  }
+
+  return {
+    init,
+    calculateTotal,
   };
-
-  // Quantity input handler
-  $("#quantity").on("input", function () {
-    // Remove non-digit characters
-    this.value = this.value.replace(/[^0-9]/g, "");
-    calculateTotal();
-  });
-
-  // Copy to clipboard with visual feedback
-  $("#copyIcon").on("click", function () {
-    const total = $("#result").text();
-    if (total !== "0") {
-      navigator.clipboard.writeText(total);
-      const $copyIcon = $(this);
-      $copyIcon.addClass("text-success");
-
-      // Create and append tooltip
-      const $tooltip = $("<span>").addClass("copy-tooltip").text("Copied!");
-      $copyIcon.append($tooltip);
-
-      // Fade out and remove tooltip after 1 second
-      setTimeout(() => {
-        $tooltip.fadeOut(300, function () {
-          $(this).remove();
-        });
-        $copyIcon.removeClass("text-success");
-      }, 1000);
-    }
-  });
-
-  // Hide dropdown when clicking outside
-  $(document).on("click", (e) => {
-    if (!$(e.target).closest(".dropdown").length) {
-      $("#licenseResults").hide();
-    }
-  });
-});
+})();
