@@ -13,5 +13,14 @@
   },
   "icons": {
     "128": "icon.png"
+  },
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Alt+Shift+L",
+        "mac": "Command+Shift+L"
+      },
+      "description": "Open License Calculator (customizable in chrome://extensions/shortcuts)"
+    }
   }
 }

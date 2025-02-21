@@ -19,8 +19,16 @@
             placeholder="Search license..."
             autocomplete="off"
             data-bs-toggle="dropdown"
+            aria-haspopup="true"
+            aria-expanded="false"
+            aria-label="Search licenses"
           />
-          <ul class="dropdown-menu w-100" id="licenseResults"></ul>
+          <ul
+            class="dropdown-menu w-100"
+            id="licenseResults"
+            role="listbox"
+            aria-labelledby="licenseSearch"
+          ></ul>
         </div>
       </div>
 

@@ -123,6 +123,9 @@ const PopupUI = (function () {
       $quantity.val("1");
       $licenseResults.hide();
       calculateTotal();
+
+      // New: Auto-focus quantity input
+      $quantity.focus().select();
     });
 
     // Quantity input handler
@@ -162,6 +165,18 @@ const PopupUI = (function () {
       if (!$(e.target).closest(".dropdown").length) {
         $licenseResults.hide();
       }
+    });
+
+    // In bindUIEvents, add these keyboard handlers
+    $quantity.on("keydown", (e) => {
+      if (e.key === "Enter" && DataModule.getSelectedLicense()?.sourceUrl) {
+        window.open(DataModule.getSelectedLicense().sourceUrl, "_blank");
+      }
+    });
+
+    $licenseSearch.on("focus", () => {
+      $licenseResults.show();
+      renderDropdownItems($licenseSearch.val());
     });
   }
 

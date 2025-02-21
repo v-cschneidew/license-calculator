@@ -36,13 +36,17 @@
             <button id="exportCsv" class="btn btn-outline-secondary">
               <i class="bi bi-download"></i> Export CSV
             </button>
-            <input
-              type="file"
-              id="importCsv"
-              class="form-control"
-              accept=".csv"
-              style="max-width: 300px"
-            />
+            <div class="position-relative">
+              <button id="importCsvBtn" class="btn btn-outline-secondary">
+                <i class="bi bi-upload"></i> Import CSV
+              </button>
+              <input
+                type="file"
+                id="importCsv"
+                class="form-control visually-hidden"
+                accept=".csv"
+              />
+            </div>
           </div>
         </div>
       </section>

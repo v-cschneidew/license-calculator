@@ -147,7 +147,7 @@ const OptionsUI = (function () {
       // Bind UI events.
       $("#addLicense").click(() => this.handleAddLicense());
       $("#exportCsv").click(() => this.handleExportCsv());
-      $("#importCsv").change((e) => this.handleImportCsv(e));
+      $("#importCsvBtn").click(() => $("#importCsv").click());
       $("#confirmRemoveBtn").click(() => this.handleConfirmRemoval());
 
       // Handle license price events.
