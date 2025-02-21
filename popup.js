@@ -69,10 +69,17 @@ const PopupUI = (function () {
     $calculationDetails = $("#calculationDetails");
     $result = $("#result");
     $copyIcon = $("#copyIcon");
+    const $card = $(".result-card");
+    const $quantityContainer = $("#quantityContainer");
 
-    // Enable and focus on the search input after data is loaded
-    $licenseSearch.prop("disabled", false);
-    $licenseSearch.focus();
+    // Hide all non-search elements on init
+    $quantityContainer.hide();
+    $card.hide();
+    $licenseResults.hide();
+    $("#sourceLink").hide();
+
+    // Enable and focus on the search input
+    $licenseSearch.prop("disabled", false).focus();
 
     bindUIEvents();
   }
@@ -115,7 +122,6 @@ const PopupUI = (function () {
       $licenseSearch.val(license.name);
       $quantity.val("1");
       $licenseResults.hide();
-      updateSourceLink(license);
       calculateTotal();
     });
 
@@ -199,27 +205,91 @@ const PopupUI = (function () {
 
   function calculateTotal() {
     const selectedLicense = DataModule.getSelectedLicense();
-    if (!selectedLicense || !$quantity.val()) {
+    const $card = $(".result-card");
+    const $cardBody = $card.find(".card-body");
+    const $cardFooter = $card.find("#sourceLink");
+    const $quantityContainer = $("#quantityContainer");
+
+    // Reset all states
+    $card.hide();
+    $quantityContainer.hide();
+    $cardBody.hide();
+    $cardFooter.hide();
+    $calculationDetails.text("");
+    $result.text("0");
+
+    if (!selectedLicense) return;
+
+    const quantity = parseInt($quantity.val()) || 0;
+    const hasValidPrice = selectedLicense.price > 0;
+    const hasSourceUrl = !!selectedLicense.sourceUrl;
+
+    // Reset card styling FIRST
+    $card.css({
+      background: "",
+      boxShadow: "",
+      padding: "",
+    });
+    $cardFooter.css({
+      padding: "",
+      borderTop: "", // Ensure border reset
+    });
+
+    // Re-attach card body if it was previously detached
+    if (!$cardBody.parent().length) {
+      $card.prepend($cardBody);
+    }
+
+    // Case 1: Valid price and source URL
+    if (hasValidPrice && hasSourceUrl) {
+      $quantityContainer.show();
+      $cardBody.show();
+      $cardFooter.show();
+      const total = quantity * selectedLicense.price * 12;
+      $calculationDetails.text(
+        `$${selectedLicense.price} x 12 months x ${quantity} =`
+      );
+      $result.text(Math.round(total));
+      $card.show();
+    }
+    // Case 2: Valid price only
+    else if (hasValidPrice) {
+      $quantityContainer.show();
+      $cardBody.show();
+      const total = quantity * selectedLicense.price * 12;
+      $calculationDetails.text(
+        `$${selectedLicense.price} x 12 months x ${quantity} =`
+      );
+      $result.text(Math.round(total));
+      $card.show();
+    }
+    // Case 3: Source URL only (show JUST the source link WITHOUT the card body)
+    else if (hasSourceUrl) {
+      // Show minimal card container with natural border
+      $card.show().css({
+        background: "transparent",
+        boxShadow: "none",
+      });
+
+      // Show source link in footer with proper spacing
+      $cardFooter.show().css({
+        padding: "0.5rem",
+        borderTop: "1px solid rgba(0,0,0,.125)", // Force border if needed
+      });
+
+      // Hide body elements while maintaining DOM structure
+      $cardBody.hide();
+      $quantityContainer.hide();
       $calculationDetails.text("");
       $result.text("0");
-      return;
+
+      // Update source link
+      $cardFooter.find("a").attr("href", selectedLicense.sourceUrl);
     }
-    const quantity = parseInt($quantity.val()) || 0;
-    const price = selectedLicense.price;
-    const calcString = `$${price} x 12 months x ${quantity} =`;
-    const total = quantity * price * 12;
 
-    $calculationDetails.text(calcString);
-    $result.text(Math.round(total));
-  }
-
-  function updateSourceLink(license) {
-    const $sourceLink = $("#sourceLink");
-    if (license && license.sourceUrl) {
-      $sourceLink.find("a").attr("href", license.sourceUrl);
-      $sourceLink.show();
-    } else {
-      $sourceLink.hide();
+    // Update source link if present in normal cases
+    if (hasSourceUrl && hasValidPrice) {
+      $cardFooter.find("a").attr("href", selectedLicense.sourceUrl);
     }
   }
 

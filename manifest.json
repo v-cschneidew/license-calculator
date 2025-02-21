@@ -7,7 +7,10 @@
     "default_icon": "icon.png"
   },
   "options_page": "options.html",
-  "permissions": ["storage", "clipboardWrite"],
+  "permissions": ["storage", "clipboardWrite", "contextMenus"],
+  "background": {
+    "service_worker": "background.js"
+  },
   "icons": {
     "128": "icon.png"
   }

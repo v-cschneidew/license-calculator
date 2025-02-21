@@ -1,16 +1,23 @@
 // options.js
 
-/*
+/**
  * CSVHelper Module
- * Deals with converting licenses to and from CSV.
+ * Handles bidirectional conversion between license data and CSV format.
+ * @namespace CSVHelper
  */
 const CSVHelper = {
+  /**
+   * Generates CSV file from licenses array and triggers browser download
+   * @param {Array.<Object>} licenses - Array of license objects to export
+   * @param {string} licenses[].name - License name (preserves whitespace)
+   * @param {number} licenses[].price - License price
+   * @param {string} licenses[].sourceUrl - Source URL for license
+   */
   exportToCsv: function (licenses) {
-    const csvContent =
-      "Name,Price,Source URL\n" +
-      licenses
-        .map((l) => `${l.name},${l.price},${l.sourceUrl || ""}`)
-        .join("\n");
+    const csvContent = Papa.unparse({
+      fields: ["Name", "Price", "Source URL"],
+      data: licenses.map((l) => [l.name, l.price, l.sourceUrl]),
+    });
     const blob = new Blob([csvContent], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -19,6 +26,12 @@ const CSVHelper = {
     a.click();
   },
 
+  /**
+   * Parses CSV file into license objects with validation
+   * @param {File} file - CSV file uploaded by user
+   * @returns {Promise.<Array.<Object>>} Promise resolving to array of sanitized license objects
+   * @throws {Error} On parsing failures or invalid CSV structure
+   */
   importFromCsv: function (file) {
     return new Promise((resolve, reject) => {
       Papa.parse(file, {
@@ -30,7 +43,7 @@ const CSVHelper = {
         complete: function (results) {
           const importedLicenses = results.data.map((record) => {
             return {
-              name: (record["Name"] || record["name"] || "").trim(),
+              name: record["Name"] || record["name"] || "",
               price: parseFloat(record["Price"] || record["price"]) || 0,
               sourceUrl: (
                 record["Source URL"] ||
@@ -46,13 +59,23 @@ const CSVHelper = {
   },
 };
 
-/*
+/**
  * OptionsUI Module
- * Manages the Options page UI rendering and event handling.
- * Encapsulates its state variables internally.
+ * Manages the options page UI state and interactions. Handles:
+ * - License list rendering
+ * - User input validation
+ * - Auto-save functionality
+ * - CSV import/export
+ * @namespace OptionsUI
  */
 const OptionsUI = (function () {
-  // A helper for debouncing functions.
+  /**
+   * Debounce function for rate-limiting expensive operations
+   * @param {Function} func - Function to debounce
+   * @param {number} wait - Debounce delay in milliseconds
+   * @param {boolean} [immediate=false] - Trigger on leading edge
+   * @returns {Function} Debounced function
+   */
   function debounce(func, wait, immediate) {
     let timeout;
     return function (...args) {
@@ -71,42 +94,55 @@ const OptionsUI = (function () {
   // This variable tracks which license is pending removal.
   let pendingRemovalIndex = null;
 
-  // Add this utility function at the top level
+  /**
+   * Sanitizes license data while preserving user-entered whitespace
+   * @param {Object} license - Raw license data from inputs
+   * @returns {Object} Sanitized license with validated types
+   */
   function sanitizeLicenseData(license) {
     return {
-      name: (license.name || "").trim(),
+      name: license.name || "",
       price: parseFloat(license.price) || 0,
       sourceUrl: (license.sourceUrl || "").trim(),
     };
   }
 
-  // Create an auto-save function that gathers current state from the DOM
-  // and saves it using LicenseStorage. We debounce here so that rapidly occurring
-  // events (like typing) do not trigger too many saves.
-  const autoSave = debounce(function () {
-    const updatedLicenses = [];
-    $("#licenseList .row").each(function () {
-      const license = sanitizeLicenseData({
-        name: $(this).find(".license-name").val(),
-        price: $(this).find(".license-price").val(),
-        sourceUrl: $(this).find(".license-url").val(),
-      });
-      updatedLicenses.push(license);
-    });
+  /**
+   * Shows the auto-save success toast notification
+   * Uses Bootstrap 5 toast component
+   */
+  function showToast() {
+    const toast = document.getElementById("autoSaveToast");
+    if (toast) {
+      new bootstrap.Toast(toast).show();
+    }
+  }
 
-    LicenseStorage.saveLicenses(updatedLicenses)
-      .then(() => {
-        const toast = new bootstrap.Toast(document.getElementById("saveToast"));
-        toast.show();
-      })
-      .catch((error) => {
-        console.error("Error auto-saving licenses:", error);
-        // Show error toast or alert
-        alert("Failed to save changes. Please try again.");
-      });
+  /**
+   * Auto-save handler with final validation check
+   * @type {Function}
+   * @description Debounced function that:
+   * 1. Checks all licenses have non-whitespace names
+   * 2. Persists to storage if valid
+   * 3. Shows success toast
+   */
+  const autoSave = debounce(function () {
+    const licenses = LicenseState.getLicenses();
+    const hasValidNames = licenses.every((l) => l.name.trim().length > 0);
+
+    if (hasValidNames) {
+      LicenseState.save().then(() => showToast());
+    }
   }, 800);
 
   return {
+    /**
+     * Initializes options page UI:
+     * - Binds event handlers
+     * - Sets up license list sorting
+     * - Renders initial license list
+     * - Subscribes to license state changes
+     */
     init: function () {
       // Bind UI events.
       $("#addLicense").click(() => this.handleAddLicense());
@@ -145,11 +181,15 @@ const OptionsUI = (function () {
       });
 
       // Subscribe to changes from LicenseState so that the UI updates automatically.
-      LicenseState.subscribe(() => this.renderLicenses());
+      LicenseState.subscribe(debounce(() => this.renderLicenses(), 300));
 
       // Add event listener for URL input
       $(document).on("change", ".license-url", function () {
+        const $row = $(this).closest(".row");
+        const index = parseInt($row.attr("data-index"), 10);
+        const license = LicenseState.getLicenses()[index];
         const url = $(this).val().trim();
+
         if (url && !isValidUrl(url)) {
           $(this).addClass("is-invalid");
           if (!$(this).next(".invalid-feedback").length) {
@@ -157,49 +197,123 @@ const OptionsUI = (function () {
               '<div class="invalid-feedback">Please enter a valid http:// or https:// URL</div>'
             );
           }
-        } else {
-          $(this).removeClass("is-invalid");
-          $(this).next(".invalid-feedback").remove();
+          // Revert to last valid value
+          $(this).val(license.sourceUrl);
+          return; // Prevent saving invalid URL
         }
+
+        $(this).removeClass("is-invalid");
+        $(this).next(".invalid-feedback").remove();
+
+        LicenseState.updateLicense(index, {
+          ...license,
+          sourceUrl: url,
+        });
+
+        // Add name validation check before saving
+        const nameValid = $row.find(".license-name").val().trim().length > 0;
+        if (nameValid) {
+          autoSave();
+        }
+      });
+
+      // Modify the event handlers to update LicenseState
+      $(document).on("input", ".license-name", function () {
+        const $row = $(this).closest(".row");
+        const index = parseInt($row.attr("data-index"), 10);
+        const license = LicenseState.getLicenses()[index];
+        LicenseState.updateLicense(index, {
+          ...license,
+          name: $(this).val(),
+        });
         autoSave();
+      });
+
+      $(document).on("input", ".license-price", function () {
+        const $row = $(this).closest(".row");
+        const index = parseInt($row.attr("data-index"), 10);
+        const license = LicenseState.getLicenses()[index];
+
+        // Get raw input value
+        let rawValue = $(this).val();
+
+        // Filter invalid characters
+        const filteredValue = rawValue.replace(/[^0-9.,]/g, "");
+
+        // Update input display immediately
+        if (filteredValue !== rawValue) {
+          $(this).val(filteredValue);
+        }
+
+        // Parse numeric value
+        const numericValue = parseFloat(filteredValue.replace(/,/g, ".")) || 0;
+
+        // Update state with numeric value
+        LicenseState.updateLicense(index, {
+          ...license,
+          price: numericValue,
+        });
+
+        // Add name validation check before saving
+        const nameValid = $row.find(".license-name").val().trim().length > 0;
+        if (nameValid) {
+          autoSave();
+        }
       });
     },
 
+    /**
+     * Renders license list while preserving user input:
+     * - Maintains existing input values
+     * - Manages row count and indices
+     * - Initializes sortable once
+     */
     renderLicenses: function () {
       const licenseList = $("#licenseList");
-      licenseList.empty();
       const licenses = LicenseState.getLicenses();
+      const currentCount = licenses.length;
+      const previousCount = licenseList.children(".row").length;
 
-      licenses.forEach((license, index) => {
-        const licenseItem = this.createLicenseRow(license, index);
-        licenseList.append(licenseItem);
-      });
+      // Full re-render when count changes
+      if (currentCount !== previousCount) {
+        licenseList.empty();
+        licenses.forEach((license, index) => {
+          licenseList.append(this.createLicenseRow(license, index));
+        });
 
-      if (!licenseList.hasClass("ui-sortable")) {
-        licenseList.sortable({
-          handle: ".handle",
-          update: function () {
-            const newLicenses = [];
-            licenseList.children(".row").each(function (i) {
-              $(this).attr("data-index", i);
-              $(this)
-                .find(".license-index")
-                .text(i + 1 + ".");
-              const name = $(this).find(".license-name").val();
-              const price =
-                parseFloat($(this).find(".license-price").val()) || 0;
-              const sourceUrl = $(this).find(".license-url").val() || "";
-              newLicenses.push({
-                name,
-                price,
-                sourceUrl,
-              });
-            });
-            LicenseState.setLicenses(newLicenses);
-            autoSave(); // Auto-save after the new order is set.
-          },
+        // Re-initialize sortable
+        if (licenseList.hasClass("ui-sortable")) {
+          licenseList.sortable("destroy");
+          licenseList.removeClass("ui-sortable");
+        }
+        this.initializeSortable();
+      } else {
+        // Just update indices when count remains the same
+        licenseList.children(".row").each(function (index) {
+          const $row = $(this);
+          $row.attr("data-index", index);
+          $row.find(".license-index").text(index + 1 + ".");
         });
       }
+    },
+
+    initializeSortable: function () {
+      const licenseList = $("#licenseList");
+      licenseList.sortable({
+        handle: ".handle",
+        update: function () {
+          const newLicenses = [];
+          licenseList.children(".row").each(function (i) {
+            const name = $(this).find(".license-name").val();
+            const price = parseFloat($(this).find(".license-price").val()) || 0;
+            const sourceUrl = $(this).find(".license-url").val() || "";
+            newLicenses.push({ name, price, sourceUrl });
+          });
+          LicenseState.setLicenses(newLicenses);
+          autoSave();
+        },
+      });
+      licenseList.addClass("ui-sortable");
     },
 
     createLicenseRow: function (license, index) {
@@ -217,17 +331,17 @@ const OptionsUI = (function () {
             </div>
           </div>
           <div class="col">
-            <input type="text" class="form-control license-name" value="${escapedName}" placeholder="License name">
+            <input type="text" class="form-control license-name" value="${escapedName}" placeholder="License name" autocomplete="off">
           </div>
           <div class="col-md-3">
             <input type="number" class="form-control license-price" step="0.01" min="0" value="${
               license.price
-            }" placeholder="Price">
+            }" placeholder="Price" autocomplete="off">
           </div>
           <div class="col">
             <div class="input-group">
               <span class="input-group-text"><i class="bi bi-link-45deg"></i></span>
-              <input type="url" class="form-control license-url" value="${escapedUrl}" placeholder="Pricing source URL">
+              <input type="url" class="form-control license-url" value="${escapedUrl}" placeholder="Pricing source URL" autocomplete="off">
             </div>
           </div>
           <div class="col-auto" style="width: 50px;">
@@ -240,18 +354,8 @@ const OptionsUI = (function () {
     },
 
     handleAddLicense: function () {
-      const currentState = [];
-      $("#licenseList .row").each(function () {
-        const license = sanitizeLicenseData({
-          name: $(this).find(".license-name").val(),
-          price: $(this).find(".license-price").val(),
-          sourceUrl: $(this).find(".license-url").val(),
-        });
-        currentState.push(license);
-      });
-      LicenseState.setLicenses(currentState);
       LicenseState.addLicense({ name: "", price: 0, sourceUrl: "" });
-      autoSave();
+      // No autoSave call here - new empty row won't trigger save
     },
 
     handleExportCsv: function () {
@@ -263,10 +367,14 @@ const OptionsUI = (function () {
       if (file) {
         try {
           const importedLicenses = await CSVHelper.importFromCsv(file);
-          // Sanitize imported data
           const sanitizedLicenses = importedLicenses.map(sanitizeLicenseData);
           LicenseState.setLicenses(sanitizedLicenses);
-          autoSave();
+
+          // Force UI update regardless of count changes
+          this.renderLicenses();
+
+          await LicenseState.save();
+          showToast();
         } catch (error) {
           console.error("Error importing CSV:", error);
           alert("Error importing CSV file. Please check the file format.");
@@ -311,11 +419,35 @@ const OptionsUI = (function () {
       if (filteredValue !== currentValue) {
         $(this).val(filteredValue);
       }
-      autoSave(); // Auto-save on changes to the license price.
+
+      // Add name validation check before saving
+      const $row = $(this).closest(".row");
+      const nameValid = $row.find(".license-name").val().trim().length > 0;
+      if (nameValid) {
+        autoSave();
+      }
     },
 
+    /**
+     * Handles license name input events:
+     * - Updates license state with raw value
+     * - Queues auto-save with validation
+     */
     handleLicenseNameInput: function () {
-      autoSave(); // Auto-save when the license name changes.
+      const $input = $(this);
+      const inputValue = $input.val();
+
+      // Update state immediately with raw value
+      const $row = $input.closest(".row");
+      const index = parseInt($row.attr("data-index"), 10);
+      const license = LicenseState.getLicenses()[index];
+      LicenseState.updateLicense(index, {
+        ...license,
+        name: inputValue,
+      });
+
+      // Always queue auto-save - final check happens in autoSave itself
+      autoSave();
     },
   };
 })();
