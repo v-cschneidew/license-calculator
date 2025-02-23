@@ -8,8 +8,17 @@ $(document).ready(async () => {
   }
 });
 
-// Utility Module for common helper functions
+/**
+ * Utility Module for common helper functions
+ * @namespace UtilityModule
+ */
 const UtilityModule = (function () {
+  /**
+   * Creates a debounced function that delays execution
+   * @param {Function} fn - Function to debounce
+   * @param {number} delay - Delay in milliseconds
+   * @returns {Function} Debounced function
+   */
   function debounce(fn, delay) {
     let timeoutId;
     return function (...args) {
@@ -22,15 +31,26 @@ const UtilityModule = (function () {
   return { debounce };
 })();
 
-// Updated Data Module to use LicenseState
+/**
+ * Data Module handling license selection and state management
+ * @namespace DataModule
+ */
 const DataModule = (function () {
   let selectedLicense = null;
 
+  /**
+   * Initializes the data module by loading licenses
+   * @returns {Array} Array of available licenses
+   */
   function init() {
     // Licenses are already loaded in LicenseState.
     return LicenseState.getLicenses();
   }
 
+  /**
+   * Sets the currently selected license
+   * @param {Object} license - License object to select
+   */
   function setSelectedLicense(license) {
     selectedLicense = license;
   }
@@ -51,7 +71,10 @@ const DataModule = (function () {
   };
 })();
 
-// Rename UIModule to PopupUI for clarity.
+/**
+ * PopupUI Module handling all UI interactions and rendering
+ * @namespace PopupUI
+ */
 const PopupUI = (function () {
   let activeIndex = -1;
   let $licenseSearch,
@@ -61,6 +84,9 @@ const PopupUI = (function () {
     $result,
     $copyIcon;
 
+  /**
+   * Initializes the popup UI components and event handlers
+   */
   function init() {
     // Cache jQuery DOM elements
     $licenseSearch = $("#licenseSearch");
@@ -84,6 +110,9 @@ const PopupUI = (function () {
     bindUIEvents();
   }
 
+  /**
+   * Binds all UI event handlers with debouncing where appropriate
+   */
   function bindUIEvents() {
     // Debounced search handler
     const debouncedSearchHandler = UtilityModule.debounce(function () {
@@ -138,25 +167,23 @@ const PopupUI = (function () {
     $copyIcon.on("click", function () {
       const total = $result.text();
       if (total !== "0") {
-        if (navigator.clipboard) {
-          navigator.clipboard.writeText(total).catch((err) => {
+        navigator.clipboard
+          .writeText(total)
+          .then(() => {
+            const $tooltip = $("<span>")
+              .addClass("copy-tooltip")
+              .text("Copied!");
+            $copyIcon.addClass("text-success").append($tooltip);
+            setTimeout(() => {
+              $tooltip.fadeOut(300, () => {
+                $(this).remove();
+                $copyIcon.removeClass("text-success");
+              });
+            }, 1000);
+          })
+          .catch((err) => {
             console.error("Clipboard error:", err);
           });
-        } else {
-          const $tempInput = $("<textarea>");
-          $("body").append($tempInput);
-          $tempInput.val(total).select();
-          document.execCommand("copy");
-          $tempInput.remove();
-        }
-        const $tooltip = $("<span>").addClass("copy-tooltip").text("Copied!");
-        $copyIcon.addClass("text-success").append($tooltip);
-        setTimeout(function () {
-          $tooltip.fadeOut(300, function () {
-            $(this).remove();
-            $copyIcon.removeClass("text-success");
-          });
-        }, 1000);
       }
     });
 
@@ -180,6 +207,9 @@ const PopupUI = (function () {
     });
   }
 
+  /**
+   * Updates the highlighted item in the dropdown list
+   */
   function updateHighlightedItem() {
     $licenseResults.find("li").removeClass("active");
     if (activeIndex >= 0) {
@@ -189,15 +219,26 @@ const PopupUI = (function () {
     }
   }
 
+  /**
+   * Renders dropdown items based on search term
+   * @param {string} searchTerm - Filter term for license search
+   */
   function renderDropdownItems(searchTerm) {
+    console.log("Fuse available?", typeof Fuse !== "undefined"); // Should log true
     $licenseResults.empty().show();
     activeIndex = -1;
 
     if (searchTerm.length > 0) {
       const licenses = DataModule.getLicenses();
-      const filtered = licenses.filter((license) =>
-        license.name.toLowerCase().includes(searchTerm)
-      );
+      const searchWords = searchTerm.toLowerCase().split(/\s+/).filter(Boolean);
+
+      const filtered = licenses.filter((license) => {
+        const licenseWords = license.name.toLowerCase().split(/\s+/);
+        return searchWords.every((word) =>
+          licenseWords.some((lWord) => lWord.includes(word))
+        );
+      });
+
       if (filtered.length === 0) {
         $("<li>")
           .addClass("dropdown-item disabled")
@@ -218,6 +259,13 @@ const PopupUI = (function () {
     }
   }
 
+  /**
+   * Calculates and displays the total cost based on selections
+   * Handles three display cases:
+   * 1. Valid price with source URL
+   * 2. Valid price without source URL
+   * 3. Source URL without valid price
+   */
   function calculateTotal() {
     const selectedLicense = DataModule.getSelectedLicense();
     const $card = $(".result-card");
@@ -280,22 +328,23 @@ const PopupUI = (function () {
     }
     // Case 3: Source URL only (show JUST the source link WITHOUT the card body)
     else if (hasSourceUrl) {
-      // Show minimal card container with natural border
+      // Remove card body from DOM completely
+      $cardBody.detach();
+
+      // Show minimal card container with default styling
       $card.show().css({
-        background: "transparent",
-        boxShadow: "none",
+        background: "",
+        boxShadow: "",
       });
 
-      // Show source link in footer with proper spacing
+      // Show source link in footer with proper styling
       $cardFooter.show().css({
-        padding: "0.5rem",
-        borderTop: "1px solid rgba(0,0,0,.125)", // Force border if needed
+        padding: "0.75rem",
+        borderTop: "1px solid rgba(0,0,0,.125)",
       });
 
-      // Hide body elements while maintaining DOM structure
-      $cardBody.hide();
+      // Hide quantity and reset result
       $quantityContainer.hide();
-      $calculationDetails.text("");
       $result.text("0");
 
       // Update source link
