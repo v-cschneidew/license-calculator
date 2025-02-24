@@ -246,3 +246,48 @@ input[type="file"] {
   white-space: nowrap;
   border: 0;
 }
+
+/* Add to the bottom of the file */
+.modal-content {
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+}
+
+.modal-header {
+  border-bottom-color: var(--border-color);
+}
+
+.modal-title {
+  color: var(--text-color);
+}
+
+.modal-body {
+  color: var(--text-color);
+}
+
+.modal-footer {
+  border-top-color: var(--border-color);
+}
+
+.btn-danger {
+  background-color: #dc3545;
+  border-color: #dc3545;
+}
+
+.btn-danger:hover {
+  background-color: #bb2d3b;
+  border-color: #bb2d3b;
+}
+
+/* Dark mode specific adjustments */
+@media (prefers-color-scheme: dark) {
+  .btn-danger {
+    background-color: #c82333;
+    border-color: #bd2130;
+  }
+
+  .btn-danger:hover {
+    background-color: #9b1c2a;
+    border-color: #881a24;
+  }
+}

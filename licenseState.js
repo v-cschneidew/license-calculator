@@ -90,10 +90,17 @@ const LicenseState = (function () {
    * Updates entire licenses array
    * @param {Array<License>} newLicenses - New array of licenses
    */
-  function setLicenses(newLicenses) {
+  async function setLicenses(newLicenses) {
     if (!Array.isArray(newLicenses)) return;
-    licenses = newLicenses.map(validateLicense);
+
+    licenses = newLicenses.map((license) => ({
+      name: String(license.name || "").trim(),
+      price: Math.max(0, Number(license.price) || 0),
+      sourceUrl: String(license.sourceUrl || "").trim(),
+    }));
+
     notify();
+    await save(); // Wait for save to complete
   }
 
   /**

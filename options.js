@@ -38,20 +38,30 @@ const CSVHelper = {
         header: true,
         skipEmptyLines: true,
         error: function (err) {
-          reject(err);
+          reject(new Error(`CSV parsing failed: ${err.message}`));
         },
         complete: function (results) {
-          const importedLicenses = results.data.map((record) => {
+          if (results.errors.length > 0) {
+            return reject(new Error(results.errors[0].message));
+          }
+
+          const importedLicenses = results.data.map((record, index) => {
+            const name = record.Name || record.name;
+            if (!name?.trim()) {
+              throw new Error(`Missing license name at row ${index + 1}`);
+            }
+
             return {
-              name: record["Name"] || record["name"] || "",
-              price: parseFloat(record["Price"] || record["price"]) || 0,
+              name: name.trim(),
+              price: parseFloat(record.Price || record.price) || 0,
               sourceUrl: (
                 record["Source URL"] ||
-                record["sourceUrl"] ||
+                record.sourceUrl ||
                 ""
               ).trim(),
             };
           });
+
           resolve(importedLicenses);
         },
       });
@@ -260,6 +270,9 @@ const OptionsUI = (function () {
           autoSave();
         }
       });
+
+      // Add this event listener:
+      $("#importCsv").on("change", (e) => this.handleImportCsv(e));
     },
 
     /**
@@ -363,24 +376,26 @@ const OptionsUI = (function () {
     },
 
     handleImportCsv: async function (e) {
-      const file = e.target.files[0];
-      if (file) {
-        try {
-          const importedLicenses = await CSVHelper.importFromCsv(file);
-          const sanitizedLicenses = importedLicenses.map(sanitizeLicenseData);
-          LicenseState.setLicenses(sanitizedLicenses);
+      const fileInput = e.target;
+      const file = fileInput.files[0];
 
-          // Force UI update regardless of count changes
-          this.renderLicenses();
+      if (!file) return;
 
-          await LicenseState.save();
-          showToast();
-        } catch (error) {
-          console.error("Error importing CSV:", error);
-          alert("Error importing CSV file. Please check the file format.");
-        }
+      try {
+        const importedLicenses = await CSVHelper.importFromCsv(file);
+        const sanitizedLicenses = importedLicenses.map(sanitizeLicenseData);
+
+        // Update state and wait for save completion
+        await LicenseState.setLicenses(sanitizedLicenses);
+
+        this.renderLicenses();
+        showToast(); // Only show after successful save
+      } catch (error) {
+        console.error("CSV Import Error:", error);
+        alert(`Import failed: ${error.message}`);
+      } finally {
+        fileInput.value = "";
       }
-      $(e.target).val("");
     },
 
     handleConfirmRemoval: function () {
